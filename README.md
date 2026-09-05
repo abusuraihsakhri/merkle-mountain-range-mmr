@@ -18,7 +18,7 @@
 
 ## 📖 What It Does
 
-**Merkle Mountain Range Mmr** is an advanced analytical and computational platform implementing Merkle Mountain Range (MMR) dynamic append-only cryptographic accumulator.
+**Merkle Mountain Range Mmr** is an advanced analytical and computational platform implementing Merkle Mountain Range (MMR) dynamic append-only cryptographic accumulator. It provides multi-agent consensus evaluation with tamper-evident audit logging and zero-PHI outbound protection.
 
 ---
 
@@ -27,51 +27,84 @@
 - **Deterministic Calculation Engine**: Strict compliance with standard reference formulations and thresholds.
 - **Risk & Urgency Classification**: Multi-tier categorization with automated clinical/operational action recommendations.
 - **Validation & Guardrails**: Rigorous input bounds checking and anomaly detection.
+- **Multi-Agent Consensus**: Specialized workers (InvariantQC, SafetyEscalation, ProtocolConformance) evaluate tasks independently.
 
 ---
 
 ## 💻 CLI Quickstart & Usage
 
-### 1. Guided Interactive Mode
+### Installation
 ```bash
-python cli.py
+pip install -e .
 ```
 
-### 2. Direct Parameterized Evaluation
+### 1. Single Task Evaluation
 ```bash
-python cli.py --task-id <value> --target <value> --primary <value> --secondary <value>
+python cli.py audit --task-id TASK-001 --target KEY-01 --primary 28.5 --secondary 14.2 --critical --status DISCORDANT
+```
+
+### 2. Batch Processing (CSV)
+```bash
+python cli.py batch -i sample.csv -o results.csv
+```
+
+### 3. System Chat Query
+```bash
+python cli.py chat "What is the system status?"
+```
+
+### 4. Verify Audit Trail Integrity
+```bash
+python cli.py verify-audit
+```
+
+### 5. Launch REST API Server
+```bash
+python cli.py serve --host 127.0.0.1 --port 8000
 ```
 
 ### Parameter Reference
-- `--task-id`: Specifies input measurement or parameter value.
-- `--target`: Specifies input measurement or parameter value.
-- `--primary`: Specifies input measurement or parameter value.
-- `--secondary`: Specifies input measurement or parameter value.
-- `--critical`: Specifies input measurement or parameter value.
-- `--status`: Specifies input measurement or parameter value.
-- `--input`: Specifies input measurement or parameter value.
-- `--output`: Specifies input measurement or parameter value.
+| Parameter | Description | Default |
+|:----------|:------------|:--------|
+| `--task-id` | Unique task/case identifier | TASK-2026-001 |
+| `--target` | Target entity or specimen key | KEY-TARGET-01 |
+| `--primary` | Primary measurement value (float) | 28.5 |
+| `--secondary` | Secondary metric value (float) | 14.2 |
+| `--critical` | Flag as critical/emergency | False |
+| `--status` | Status descriptor | DISCORDANT |
 
-### Input Data Schema
+### Input Data Schema (CSV)
 
 | Field | Description | Requirement |
 |:------|:------------|:------------|
-| `task_id` | Parameter / observation metric | Required |
-| `target_identifier` | Parameter / observation metric | Required |
-| `primary_metric` | Parameter / observation metric | Required |
-| `secondary_metric` | Parameter / observation metric | Required |
-| `is_critical_flag` | Parameter / observation metric | Required |
-| `status_descriptor` | Parameter / observation metric | Required |
+| `task_id` | Unique task identifier | Required |
+| `target_identifier` | Target entity key | Required |
+| `primary_metric` | Primary measurement (float) | Required |
+| `secondary_metric` | Secondary metric (float) | Required |
+| `is_critical_flag` | Critical flag (True/False) | Required |
+| `status_descriptor` | Status code | Required |
 
 ---
 
 ## 🛡️ Security & Enterprise Architecture
 
-* **Zero-PHI Outbound Interceptor:** Active AST and regex inspection blocking SSNs, MRNs, phone numbers, and patient identifiers.
-* **Tamper-Evident HMAC-SHA256 Audit Trail:** Chained, cryptographically signed logs for every evaluation and state transition.
+* **Zero-PHI Outbound Interceptor:** Active regex inspection blocking SSNs, MRNs, phone numbers, and patient identifiers. Applied to all inputs including batch CSV processing.
+* **Tamper-Evident HMAC-SHA256 Audit Trail:** Chained, cryptographically signed logs with full signature verification for every evaluation and state transition.
+* **Input Validation:** Rejects NaN, infinite, and empty values to prevent sensor/algorithm fault propagation.
 * **Air-Gapped LLM Reasoning Adapter:** Agnostic integration for local Ollama instances (`llama3`, `mistral`), Claude 3.5 Sonnet, GPT-4o, and deterministic test mocks.
-* **Active Learning Bayesian Calibration:** Dynamic tracker updating worker reliability weights and monitoring Brier calibration drift.
 * **FastAPI & Prometheus Telemetry:** Exposes OpenAPI 3.1 REST endpoints and operational Prometheus metrics (`/metrics`).
+
+### Security Configuration
+
+Set a cryptographically secure audit key before production deployment:
+
+```bash
+# Linux/macOS
+export AUDIT_SECRET_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")
+
+# Windows PowerShell
+$env:AUDIT_SECRET_KEY = -join ((1..32 | ForEach-Object { '{0:x}' -f (Get-Random -Max 16) }))
+```
 
 ---
 
@@ -86,14 +119,46 @@ pytest -v
 Execute high-throughput batch simulation benchmarks:
 
 ```bash
-python simulator.py --tasks 1000 --concurrency 8
+python simulator.py 1000
 ```
 
 ---
 
 ## 🐳 Container Deployment
 
+### Docker
 ```bash
 docker build -t merkle-mountain-range-mmr .
-docker run -p 8000:8000 merkle-mountain-range-mmr
+docker run -p 8000:8000 -e AUDIT_SECRET_KEY=your-secret-key merkle-mountain-range-mmr
+```
+
+### Docker Compose
+```bash
+# Create .env file with your secret key
+echo "AUDIT_SECRET_KEY=your-secret-key" > .env
+
+# Start the service
+docker-compose up -d
+```
+
+---
+
+## 📁 Project Structure
+
+```
+merkle-mountain-range-mmr/
+├── agents/                    # Core agent system
+│   ├── base.py               # Security, PHI guard, audit trail
+│   ├── models.py             # Pydantic data models
+│   ├── supervisor.py         # Multi-agent orchestrator
+│   ├── workers.py            # Specialized evaluation workers
+│   ├── api.py                # FastAPI REST endpoints
+│   └── ...
+├── merkle_mountain_range/    # Alternative MMR implementation
+├── tests/                    # Test suite
+├── cli.py                    # Command-line interface
+├── simulator.py              # High-throughput simulation
+├── web/                      # Operations console (HTML)
+├── Dockerfile                # Container definition
+└── docker-compose.yml        # Multi-container orchestration
 ```

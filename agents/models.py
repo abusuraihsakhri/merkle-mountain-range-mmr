@@ -4,9 +4,10 @@ Domain: Clinical & Biomedical AI
 Standard: CAP / CLSI / ISO Standards
 """
 import datetime
+import math
 from enum import Enum
 from typing import Dict, Any, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class UrgencyLevel(str, Enum):
@@ -30,6 +31,22 @@ class SystemTaskPayload(BaseModel):
     is_critical_flag: bool = Field(default=False, description="Emergency escalation or high priority trigger")
     attributes: Dict[str, Any] = Field(default_factory=dict, description="Metadata key-value pairs")
     timestamp: str = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat())
+
+    @field_validator("primary_metric", "secondary_metric")
+    @classmethod
+    def validate_metric_finite(cls, v: float) -> float:
+        """Reject NaN and infinite values which indicate sensor/algorithm faults."""
+        if math.isnan(v) or math.isinf(v):
+            raise ValueError(f"Metric value must be finite, got {v}")
+        return v
+
+    @field_validator("task_id", "target_identifier")
+    @classmethod
+    def validate_nonempty(cls, v: str) -> str:
+        """Ensure required string fields are not empty."""
+        if not v or not v.strip():
+            raise ValueError("Required field cannot be empty")
+        return v.strip()
 
 
 class AgentAlert(BaseModel):

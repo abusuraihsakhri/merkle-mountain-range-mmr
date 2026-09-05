@@ -7,7 +7,7 @@ import json
 import sys
 from agents.models import SystemTaskPayload
 from agents.supervisor import SystemSupervisor
-from agents.base import AuditLogger
+from agents.base import AuditLogger, PHIGuard, SecurityException
 
 supervisor = SystemSupervisor(model_provider="mock")
 
@@ -87,7 +87,18 @@ def main(argv=None):
 
         out_fields = fieldnames + ["overall_urgency", "integrity_status", "total_alerts", "audit_hash"]
         out_rows = []
+        skipped_phi = 0
         for r in rows:
+            # Validate PHI in batch input fields
+            try:
+                PHIGuard.assert_no_phi(r.get("task_id", ""))
+                PHIGuard.assert_no_phi(r.get("target_identifier", ""))
+                PHIGuard.assert_no_phi(r.get("status_descriptor", ""))
+            except SecurityException as e:
+                print(f"  [SKIP] PHI violation in row: {e}")
+                skipped_phi += 1
+                continue
+
             payload = SystemTaskPayload(
                 task_id=r.get("task_id", "TASK-01"),
                 target_identifier=r.get("target_identifier", "TARGET-01"),
@@ -108,7 +119,7 @@ def main(argv=None):
             writer = csv.DictWriter(f, fieldnames=out_fields)
             writer.writeheader()
             writer.writerows(out_rows)
-        print(f"Processed {len(out_rows)} records -> {args.output}")
+        print(f"Processed {len(out_rows)} records -> {args.output} (skipped {skipped_phi} PHI-violating rows)")
         return 0
 
     if args.command == "serve":

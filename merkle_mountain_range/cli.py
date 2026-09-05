@@ -4,11 +4,21 @@ Command-Line Interface for Merkle Mountain Range (MMR) Dynamic Append-Only Crypt
 import argparse
 import csv
 import json
+import importlib
 import sys
 from .models import FrontierPayload
 from .agents import MMRCoordinator
 
 coordinator = MMRCoordinator()
+
+
+def _get_phi_guard():
+    """Import PHIGuard from agents module if available."""
+    try:
+        agents_base = importlib.import_module("agents.base")
+        return agents_base.PHIGuard, agents_base.SecurityException
+    except (ImportError, AttributeError):
+        return None, None
 
 
 def main(argv=None):
@@ -76,7 +86,20 @@ def main(argv=None):
 
         out_fields = fieldnames + ["overall_status", "total_alerts", "critical_count", "consensus_summary"]
         out_rows = []
+        skipped_phi = 0
+        PHIGuard, SecurityException = _get_phi_guard()
         for r in rows:
+            # Validate PHI in batch input fields if guard is available
+            if PHIGuard is not None:
+                try:
+                    PHIGuard.assert_no_phi(r.get("task_id", ""))
+                    PHIGuard.assert_no_phi(r.get("target_identifier", ""))
+                    PHIGuard.assert_no_phi(r.get("status_descriptor", ""))
+                except SecurityException as e:
+                    print(f"  [SKIP] PHI violation in row: {e}")
+                    skipped_phi += 1
+                    continue
+
             payload = FrontierPayload(
                 task_id=r.get("task_id", "TASK-01"),
                 target_identifier=r.get("target_identifier", "TARGET-01"),
@@ -97,7 +120,7 @@ def main(argv=None):
             writer = csv.DictWriter(f, fieldnames=out_fields)
             writer.writeheader()
             writer.writerows(out_rows)
-        print(f"Processed {len(out_rows)} records -> {args.output}")
+        print(f"Processed {len(out_rows)} records -> {args.output} (skipped {skipped_phi} PHI-violating rows)")
         return 0
 
     if args.command == "serve":
