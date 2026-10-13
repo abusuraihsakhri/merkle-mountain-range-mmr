@@ -12,6 +12,16 @@ from agents.base import AuditLogger, PHIGuard, SecurityException
 supervisor = SystemSupervisor(model_provider="mock")
 
 
+def _parse_csv_bool(value):
+    """Recognize CSV true/false tokens rather than Python's bool(nonempty_str)."""
+    normalized = str(value or "").strip().lower()
+    if normalized in {"true", "t", "1", "yes", "y"}:
+        return True
+    if normalized in {"false", "f", "0", "no", "n", ""}:
+        return False
+    raise ValueError("is_critical_flag must be true or false")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(prog="merkle-mountain-range-mmr", description="Merkle Mountain Range Mmr")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -105,7 +115,7 @@ def main(argv=None):
                 primary_metric=float(r.get("primary_metric", 15.0)),
                 secondary_metric=float(r.get("secondary_metric", 5.0)),
                 status_descriptor=r.get("status_descriptor", "NOMINAL"),
-                is_critical_flag=bool(r.get("is_critical_flag", False)),
+                is_critical_flag=_parse_csv_bool(r.get("is_critical_flag", False)),
             )
             dossier = supervisor.process_task(payload)
             row_dict = dict(r)
