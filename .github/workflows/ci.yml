@@ -30,3 +30,16 @@ jobs:
         run: |
           merkle-mountain-range-mmr mmr --leaf alpha --leaf beta --prove-index 0 --consistency-from 1
           python cli.py verify-audit
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: JavaScript syntax
+        run: |
+          node --check web/mmr.mjs
+          node --check web/app.mjs
+      - name: Browser algorithm tests
+        run: node tests/mmr_web.mjs
