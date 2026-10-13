@@ -23,6 +23,11 @@ def _parse_csv_bool(value):
 
 
 def main(argv=None):
+    # Keep the existing telemetry commands while supporting MMR operations.
+    commands = sys.argv[1:] if argv is None else list(argv)
+    if commands and commands[0] == "mmr":
+        from merkle_mountain_range.cli import main as mmr_main
+        return mmr_main(commands)
     parser = argparse.ArgumentParser(prog="merkle-mountain-range-mmr", description="Merkle Mountain Range Mmr")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
