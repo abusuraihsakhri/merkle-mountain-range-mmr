@@ -3,6 +3,7 @@ Enterprise Security, PHI Outbound Guard, and HMAC-SHA256 Audit Trail.
 
 """
 import os
+import secrets
 import re
 import json
 import time
@@ -13,9 +14,7 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
 from pydantic import BaseModel, Field
 
-# Default secret key used only as a fallback; production deployments MUST set
-# the AUDIT_SECRET_KEY environment variable to a cryptographically secure value.
-_DEFAULT_AUDIT_KEY = "merkle-mountain-range-mmr-master-audit-key-2026"
+# The audit key must never be a hard-coded shared secret.
 
 PHI_PATTERNS = [
     re.compile(r"\b(?:MRN|mrn)[:#\s-]*\d{4,10}\b", re.IGNORECASE),
@@ -62,11 +61,14 @@ class PHIGuard:
 class AuditTrail:
     """Cryptographic Tamper-Evident HMAC-SHA256 Audit Trail."""
     def __init__(self, secret_key: Optional[str] = None):
-        resolved_key = secret_key or os.getenv("AUDIT_SECRET_KEY", _DEFAULT_AUDIT_KEY)
-        if resolved_key == _DEFAULT_AUDIT_KEY:
+        resolved_key = secret_key or os.getenv("AUDIT_SECRET_KEY")
+        if not resolved_key:
+            # An unpredictable in-process key protects local tests and development.
+            # Logs are not persisted; they cannot be re-verified after process exit.
+            resolved_key = secrets.token_hex(32)
             warnings.warn(
-                "AUDIT_SECRET_KEY not set; using default development key. "
-                "Set a cryptographically secure AUDIT_SECRET_KEY environment variable in production.",
+                "AUDIT_SECRET_KEY not set: using an ephemeral random audit key. "
+                "Set a stable secret for separately managed deployments.",
                 RuntimeWarning,
                 stacklevel=2,
             )
