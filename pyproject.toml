@@ -7,14 +7,13 @@ name = "merkle-mountain-range-mmr"
 version = "2.0.0"
 description = "Merkle Mountain Range (MMR) Dynamic Append-Only Cryptographic Accumulator"
 readme = "README.md"
-authors = [{ name = "Dr. Abu Suraih Sakhri", email = "abusuraih@example.com" }]
+authors = [{ name = "Dr. Abu Suraih Sakhri" }]
 license = { text = "MIT" }
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Topic :: Security/Cryptography",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 requires-python = ">=3.10"
 dependencies = ["pydantic>=2.5,<3"]
