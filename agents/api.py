@@ -58,4 +58,6 @@ def api_audit_logs():
 
 
 # Register the static browser explorer after API routes so they retain precedence.
-app.mount("/", StaticFiles(directory=Path(__file__).resolve().parent.parent / "web", html=True), name="explorer")
+_browser_root = Path(__file__).resolve().parent.parent / "web"
+if _browser_root.is_dir():
+    app.mount("/", StaticFiles(directory=_browser_root, html=True), name="explorer")
