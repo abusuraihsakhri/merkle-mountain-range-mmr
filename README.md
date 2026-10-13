@@ -1,164 +1,107 @@
-# Merkle Mountain Range Mmr
+# Merkle Mountain Range (MMR)
 
-> **Domain:** Clinical Decision Support & Biomedical Computing  
-> **Reference Guidelines & Standards:** `Standard Clinical Formulations & ISO/IEC Quality Frameworks`
+A SHA-256 append-only accumulator with independently verifiable inclusion and append-only consistency proofs. The repository also retains its earlier threshold-based telemetry, HMAC audit trail, batch CLI, and FastAPI endpoints. **The telemetry subsystem is distinct from the MMR cryptographic implementation.**
 
-<div align="center">
+## Browser application
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-3776AB.svg?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688.svg?logo=fastapi&logoColor=white)
-![Audit Trail](https://img.shields.io/badge/Audit-HMAC--SHA256_Tamper--Evident-brightgreen.svg)
-![Zero-PHI Guard](https://img.shields.io/badge/Guard-Zero--PHI_Outbound-blue.svg)
-![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker&logoColor=white)
+Open the GitHub Pages application when deployment has been enabled, or run the static application locally:
 
-</div>
+~~~bash
+python -m http.server 8080 --directory web
+~~~
 
----
+Open http://127.0.0.1:8080. Append UTF-8 leaves, select a leaf to generate an inclusion proof, alter the leaf or JSON proof to test rejection, and generate a consistency proof between checkpoints. Export either proof as JSON. Computation uses the browser's built-in Web Crypto SHA-256; no Python interpreter, backend, external API, accounts, or uploaded data are needed. Data is stored only in tab memory and disappears on reload.
 
-## 📖 What It Does
+Browser requirements: a current Chromium, Firefox, or Safari browser with Web Crypto and JavaScript modules. Use HTTPS or localhost (secure contexts). The browser demo limits input to **1,024 leaves** and **8 KiB per leaf**.
 
-**Merkle Mountain Range Mmr** is an advanced analytical and computational platform implementing Merkle Mountain Range (MMR) dynamic append-only cryptographic accumulator. It provides multi-agent consensus evaluation with tamper-evident audit logging and zero-PHI outbound protection.
+## Python library
 
----
+Install in a Python 3.10+ environment:
 
-## ⚙️ Key Capabilities & Algorithmic Modules
+~~~bash
+python -m pip install -e .
+~~~
 
-- **Deterministic Calculation Engine**: Strict compliance with standard reference formulations and thresholds.
-- **Risk & Urgency Classification**: Multi-tier categorization with automated clinical/operational action recommendations.
-- **Validation & Guardrails**: Rigorous input bounds checking and anomaly detection.
-- **Multi-Agent Consensus**: Specialized workers (InvariantQC, SafetyEscalation, ProtocolConformance) evaluate tasks independently.
+~~~python
+from merkle_mountain_range.mmr import MerkleMountainRange
 
----
+mmr = MerkleMountainRange()
+mmr.append("alpha")
+mmr.append("beta")
+trusted_root = mmr.root
 
-## 💻 CLI Quickstart & Usage
+proof = mmr.inclusion_proof(0)
+assert MerkleMountainRange.verify_inclusion("alpha", proof, trusted_root)
+assert not MerkleMountainRange.verify_inclusion("changed", proof, trusted_root)
 
-### Installation
-```bash
-pip install -e .
-```
+old = MerkleMountainRange()
+old.append("alpha")
+extension = mmr.consistency_proof(old.size)
+assert MerkleMountainRange.verify_consistency(old.root, trusted_root, extension)
+~~~
 
-### 1. Single Task Evaluation
-```bash
-python cli.py audit --task-id TASK-001 --target KEY-01 --primary 28.5 --secondary 14.2 --critical --status DISCORDANT
-```
+Command-line root and proofs:
 
-### 2. Batch Processing (CSV)
-```bash
+~~~bash
+merkle-mountain-range-mmr mmr --leaf alpha --leaf beta --leaf gamma --prove-index 1 --consistency-from 2
+# Also supported: python cli.py mmr --leaf alpha --leaf beta
+~~~
+
+### Hashing protocol
+
+The implementation defines its own deterministic serialization; it is **not automatically interoperable** with Ethereum, Grin, or other MMR protocols.
+
+| Component | SHA-256 input |
+| --- | --- |
+| Leaf | `0x00 || UTF8(leaf)` |
+| Internal parent | `0x01 || left_digest || right_digest` |
+| Peak bagging | `0x02 || left_peak || right_accumulator` (right to left) |
+| Empty MMR root | `SHA256(0x03)` |
+
+Roots are lowercase 64-character hex strings. The peaks are maximal perfect binary trees in left-to-right order. Inclusion proofs include the authentication path and ordered peak hashes and require an **independently trusted root**. Their size is logarithmic in leaf count. Consistency proofs provide old peak hashes and all appended leaf hashes; proof size is **O(number of newly appended leaves)**, not logarithmic. This protocol is an educational/reference implementation; it has not undergone an external cryptographic audit.
+
+## Legacy telemetry and REST API
+
+Install optional API dependencies:
+
+~~~bash
+python -m pip install -e ".[api]"
+python cli.py audit --task-id T-01 --target KEY-01 --primary 28.5 --secondary 14.2 --critical
 python cli.py batch -i sample.csv -o results.csv
-```
-
-### 3. System Chat Query
-```bash
-python cli.py chat "What is the system status?"
-```
-
-### 4. Verify Audit Trail Integrity
-```bash
 python cli.py verify-audit
-```
-
-### 5. Launch REST API Server
-```bash
 python cli.py serve --host 127.0.0.1 --port 8000
-```
+~~~
 
-### Parameter Reference
-| Parameter | Description | Default |
-|:----------|:------------|:--------|
-| `--task-id` | Unique task/case identifier | TASK-2026-001 |
-| `--target` | Target entity or specimen key | KEY-TARGET-01 |
-| `--primary` | Primary measurement value (float) | 28.5 |
-| `--secondary` | Secondary metric value (float) | 14.2 |
-| `--critical` | Flag as critical/emergency | False |
-| `--status` | Status descriptor | DISCORDANT |
+The local API serves the browser explorer at **http://127.0.0.1:8000/** when run from the repository checkout. Existing API routes include `GET /health`, `GET /metrics` (JSON counters), `POST /api/audit`, `POST /api/chat`, and `GET /api/audit/logs`. The telemetry subsystem applies configurable threshold-like rules, not a medical or cryptographic standards-conformance engine; its chat provider is a deterministic mock, not an external model integration.
 
-### Input Data Schema (CSV)
+CSV batch input has the fields `task_id,target_identifier,primary_metric,secondary_metric,is_critical_flag,status_descriptor`. The critical flag recognizes `true/false`, `yes/no`, or `1/0` (case-insensitive). Malformed flags raise an error rather than being silently treated as true.
 
-| Field | Description | Requirement |
-|:------|:------------|:------------|
-| `task_id` | Unique task identifier | Required |
-| `target_identifier` | Target entity key | Required |
-| `primary_metric` | Primary measurement (float) | Required |
-| `secondary_metric` | Secondary metric (float) | Required |
-| `is_critical_flag` | Critical flag (True/False) | Required |
-| `status_descriptor` | Status code | Required |
+### Security and data handling
 
----
+- The browser MMR explorer performs **no outbound data transfer** and does not persist leaves or keys.
+- HMAC telemetry logs are **in-memory**; for controlled deployments set `AUDIT_SECRET_KEY` to a securely generated, private value. Without it, a random process-local key is generated, and old logs cannot be verified after restart. Logs are not a substitute for a persistent audited ledger.
+- The legacy PHI guard uses simple regular expressions. **It is not comprehensive de-identification, regulatory compliance verification, or a guarantee that protected data cannot escape.** Avoid inputting patient data.
+- The development REST API does not implement authentication. Do not expose it publicly without an authentication and access-control proxy.
 
-## 🛡️ Security & Enterprise Architecture
+Docker / Compose (the Compose port binds to loopback):
 
-* **Zero-PHI Outbound Interceptor:** Active regex inspection blocking SSNs, MRNs, phone numbers, and patient identifiers. Applied to all inputs including batch CSV processing.
-* **Tamper-Evident HMAC-SHA256 Audit Trail:** Chained, cryptographically signed logs with full signature verification for every evaluation and state transition.
-* **Input Validation:** Rejects NaN, infinite, and empty values to prevent sensor/algorithm fault propagation.
-* **Air-Gapped LLM Reasoning Adapter:** Agnostic integration for local Ollama instances (`llama3`, `mistral`), Claude 3.5 Sonnet, GPT-4o, and deterministic test mocks.
-* **FastAPI & Prometheus Telemetry:** Exposes OpenAPI 3.1 REST endpoints and operational Prometheus metrics (`/metrics`).
+~~~bash
+export AUDIT_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_hex(32))')"
+docker compose up --build
+~~~
 
-### Security Configuration
+## Verification
 
-Set a cryptographically secure audit key before production deployment:
+~~~bash
+python -m pip install -e ".[api,test]"
+python -m pytest -q
+node --check web/app.mjs
+node --check web/mmr.mjs
+node tests/mmr_web.mjs
+~~~
 
-```bash
-# Linux/macOS
-export AUDIT_SECRET_KEY=$(python -c "import secrets; print(secrets.token_hex(32))")
+CI covers Python 3.10–3.13 and Node 22. The `.github/workflows/pages.yml` workflow deploys `web/` from `master` after GitHub Pages is configured for GitHub Actions. The app uses no Pyodide: native JavaScript/Web Crypto is lighter and avoids runtime dependency downloads.
 
-# Windows PowerShell
-$env:AUDIT_SECRET_KEY = -join ((1..32 | ForEach-Object { '{0:x}' -f (Get-Random -Max 16) }))
-```
+## License
 
----
-
-## 🧪 Testing & Verification
-
-Run the automated test suite:
-
-```bash
-pytest -v
-```
-
-Execute high-throughput batch simulation benchmarks:
-
-```bash
-python simulator.py 1000
-```
-
----
-
-## 🐳 Container Deployment
-
-### Docker
-```bash
-docker build -t merkle-mountain-range-mmr .
-docker run -p 8000:8000 -e AUDIT_SECRET_KEY=your-secret-key merkle-mountain-range-mmr
-```
-
-### Docker Compose
-```bash
-# Create .env file with your secret key
-echo "AUDIT_SECRET_KEY=your-secret-key" > .env
-
-# Start the service
-docker-compose up -d
-```
-
----
-
-## 📁 Project Structure
-
-```
-merkle-mountain-range-mmr/
-├── agents/                    # Core agent system
-│   ├── base.py               # Security, PHI guard, audit trail
-│   ├── models.py             # Pydantic data models
-│   ├── supervisor.py         # Multi-agent orchestrator
-│   ├── workers.py            # Specialized evaluation workers
-│   ├── api.py                # FastAPI REST endpoints
-│   └── ...
-├── merkle_mountain_range/    # Alternative MMR implementation
-├── tests/                    # Test suite
-├── cli.py                    # Command-line interface
-├── simulator.py              # High-throughput simulation
-├── web/                      # Operations console (HTML)
-├── Dockerfile                # Container definition
-└── docker-compose.yml        # Multi-container orchestration
-```
+MIT — see [LICENSE](LICENSE).
