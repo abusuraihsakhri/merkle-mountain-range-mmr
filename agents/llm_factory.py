@@ -1,5 +1,5 @@
 """
-Inference Engine supporting local Ollama, Claude, OpenAI, and deterministic Mock with Zero-PHI checks.
+Deterministic offline mock provider; aliases do not initiate network requests.
 """
 from typing import Dict, Any, Optional
 from .base import PHIGuard
@@ -15,7 +15,7 @@ class MockLLM:
 
 
 class LLMFactory:
-    """Creates configured LLM client instances with zero-PHI protection."""
+    """Returns a deterministic mock for all legacy provider aliases."""
 
     @staticmethod
     def create(provider: str = "mock", system_name: str = "Merkle Mountain Range Mmr"):

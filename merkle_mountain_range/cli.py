@@ -21,6 +21,16 @@ def _get_phi_guard():
         return None, None
 
 
+def _parse_csv_bool(value):
+    """Recognize CSV true/false tokens rather than Python's bool(nonempty_str)."""
+    normalized = str(value or "").strip().lower()
+    if normalized in {"true", "t", "1", "yes", "y"}:
+        return True
+    if normalized in {"false", "f", "0", "no", "n", ""}:
+        return False
+    raise ValueError("is_critical_flag must be true or false")
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(prog="merkle-mountain-range-mmr", description="Merkle Mountain Range (MMR) Dynamic Append-Only Cryptographic Accumulator")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -43,12 +53,37 @@ def main(argv=None):
     p_batch.add_argument("-i", "--input", required=True)
     p_batch.add_argument("-o", "--output", default="results.csv")
 
+    # Cryptographic MMR explorer; stateless CLI leaves supplied per invocation.
+    p_mmr = subparsers.add_parser("mmr", help="Build SHA-256 MMR, root and proofs")
+    p_mmr.add_argument("--leaf", action="append", required=True,
+                       help="Append UTF-8 leaf; repeat for multiple leaves")
+    p_mmr.add_argument("--prove-index", type=int)
+    p_mmr.add_argument("--consistency-from", type=int)
+
     # Serve
     p_serve = subparsers.add_parser("serve", help="Launch FastAPI REST server")
     p_serve.add_argument("--host", default="127.0.0.1")
     p_serve.add_argument("--port", type=int, default=8000)
 
     args = parser.parse_args(argv)
+
+    if args.command == "mmr":
+        from .mmr import MerkleMountainRange
+        mmr = MerkleMountainRange()
+        for leaf in args.leaf:
+            mmr.append(leaf)
+        result = {"size": mmr.size, "root": mmr.root, "peaks": mmr.peaks}
+        if args.prove_index is not None:
+            result["inclusion_proof"] = mmr.inclusion_proof(args.prove_index)
+        if args.consistency_from is not None:
+            proof = mmr.consistency_proof(args.consistency_from)
+            old = MerkleMountainRange()
+            for leaf in args.leaf[:args.consistency_from]:
+                old.append(leaf)
+            result["consistency_proof"] = proof
+            result["old_root"] = old.root
+        print(json.dumps(result, indent=2))
+        return 0
 
     if args.command == "audit":
         payload = FrontierPayload(
@@ -106,7 +141,7 @@ def main(argv=None):
                 primary_metric=float(r.get("primary_metric", 15.0)),
                 secondary_metric=float(r.get("secondary_metric", 5.0)),
                 status_descriptor=r.get("status_descriptor", "NOMINAL"),
-                is_critical_flag=bool(r.get("is_critical_flag", False)),
+                is_critical_flag=_parse_csv_bool(r.get("is_critical_flag", False)),
             )
             dossier = coordinator.process(payload)
             row_dict = dict(r)

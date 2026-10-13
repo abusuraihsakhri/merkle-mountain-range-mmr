@@ -4,6 +4,7 @@ Domain: Post-Quantum Cryptography & Zero-Knowledge
 Standard: Merkle Mountain Range (MMR) Cryptography
 """
 import datetime
+import math
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List, Optional, Any
@@ -25,6 +26,15 @@ class FrontierPayload:
     is_critical_flag: bool = False
     attributes: Dict[str, Any] = field(default_factory=dict)
     timestamp: str = field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat())
+
+    def __post_init__(self):
+        for field_name in ("task_id", "target_identifier"):
+            value = getattr(self, field_name)
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(field_name + " cannot be empty")
+        for field_name in ("primary_metric", "secondary_metric"):
+            if not math.isfinite(getattr(self, field_name)):
+                raise ValueError(field_name + " must be finite")
 
 
 @dataclass

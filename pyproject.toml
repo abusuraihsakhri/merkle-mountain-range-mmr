@@ -7,17 +7,20 @@ name = "merkle-mountain-range-mmr"
 version = "2.0.0"
 description = "Merkle Mountain Range (MMR) Dynamic Append-Only Cryptographic Accumulator"
 readme = "README.md"
-authors = [{ name = "Dr. Abu Suraih Sakhri", email = "abusuraih@example.com" }]
+authors = [{ name = "Dr. Abu Suraih Sakhri" }]
 license = { text = "MIT" }
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Topic :: Security/Cryptography",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
-requires-python = ">=3.9"
-dependencies = []
+requires-python = ">=3.10"
+dependencies = ["pydantic>=2.5,<3"]
+
+[project.optional-dependencies]
+api = ["fastapi>=0.111,<1", "uvicorn>=0.25,<1"]
+test = ["pytest>=8,<10", "httpx>=0.27,<1"]
 
 [project.scripts]
 merkle-mountain-range-mmr = "merkle_mountain_range.cli:main"
@@ -25,3 +28,9 @@ merkle-mountain-range-mmr = "merkle_mountain_range.cli:main"
 [project.urls]
 Homepage = "https://github.com/abusuraihsakhri/merkle-mountain-range-mmr"
 Repository = "https://github.com/abusuraihsakhri/merkle-mountain-range-mmr.git"
+
+[tool.setuptools.packages.find]
+include = ["agents*", "merkle_mountain_range*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
